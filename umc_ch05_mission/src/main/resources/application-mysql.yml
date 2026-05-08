@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: "프로젝트 명" # "umc10th"
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PW}
+
+  sql:
+    init:
+      mode: always          # data.sql을 항상 실행 (embedded DB 아닐 때도)
+      encoding: UTF-8
+
+  jpa:
+    database: mysql
+    database-platform: org.hibernate.dialect.MySQLDialect
+    show-sql: true
+    hibernate:
+      ddl-auto: update
+    defer-datasource-initialization: true  # JPA 테이블 생성 후 data.sql 실행
+    properties:
+      hibernate:
+        format_sql: true
+
