@@ -13,9 +13,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -83,28 +82,40 @@ public class MemberController {
         return ApiResponse.onSuccess(memberService.getHomeProgress(1L, region));
     }
 
-    @Operation(summary = "내 미션 목록 조회", description = "상태(ONGOING / COMPLETE)로 필터링한 내 미션 목록을 페이징하여 반환합니다.")
+    @Operation(summary = "내 미션 목록 조회",
+               description = "상태(ONGOING / COMPLETE)로 필터링한 내 미션 목록을 오프셋 기반 페이지네이션으로 반환합니다. " +
+                             "사용자 ID는 RequestBody로 전달받습니다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잘못된 status 값")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잘못된 요청값")
     })
-    @GetMapping("/members/me/missions")
+    @PostMapping("/members/me/missions")
     public ApiResponse<Page<MissionResDTO.MissionItemRes>> getMyMissions(
-            @Parameter(description = "미션 상태 (ONGOING | COMPLETE)", example = "ONGOING", required = true)
-            @RequestParam String status,
-            @ParameterObject Pageable pageable) {
-        // TODO: Spring Security 적용 후 @AuthenticationPrincipal로 memberId 주입
-        return ApiResponse.onSuccess(memberService.getMyMissions(1L, status, pageable));
+            @Valid @RequestBody MemberReqDTO.MyMissionsReq req) {
+        PageRequest pageable = PageRequest.of(req.getPageNumber(), req.getPageSize());
+        return ApiResponse.onSuccess(memberService.getMyMissions(req.getMemberId(), req.getStatus(), pageable));
     }
 
-    @Operation(summary = "내가 쓴 리뷰 목록 조회", description = "로그인한 회원이 작성한 모든 리뷰 목록을 반환합니다.")
+    @Operation(summary = "내가 쓴 리뷰 목록 조회",
+               description = "커서 기반 페이지네이션으로 내 리뷰 목록을 반환합니다. (사진 제외)\n\n" +
+                             "- query: 정렬 기준 (id = ID 내림차순, rating = 별점 내림차순)\n" +
+                             "- cursor: 첫 요청은 -1, 이후 응답의 nextCursor 값을 전달\n" +
+                             "  - id 정렬 시: cursor 형식 = \"10\" (마지막 id)\n" +
+                             "  - rating 정렬 시: cursor 형식 = \"4:10\" (마지막 rating:id)")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "회원 없음")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잘못된 query 값")
     })
     @GetMapping("/members/me/reviews")
-    public ApiResponse<ReviewResDTO.ReviewListRes> getMyReviews() {
-        // TODO: Spring Security 적용 후 @AuthenticationPrincipal로 memberId 주입
-        return ApiResponse.onSuccess(memberService.getMyReviews(1L));
+    public ApiResponse<ReviewResDTO.CursorPagination<ReviewResDTO.ReviewItemRes>> getMyReviews(
+            @Parameter(description = "회원 ID", example = "1", required = true)
+            @RequestParam Long memberId,
+            @Parameter(description = "페이지 크기", example = "10")
+            @RequestParam(defaultValue = "10") Integer pageSize,
+            @Parameter(description = "커서 값 (첫 요청: -1)", example = "-1")
+            @RequestParam(defaultValue = "-1") String cursor,
+            @Parameter(description = "정렬 기준 (id 또는 rating)", example = "id")
+            @RequestParam(defaultValue = "id") String query) {
+        return ApiResponse.onSuccess(memberService.getMyReviews(memberId, pageSize, cursor, query));
     }
 }

@@ -21,5 +21,6 @@ public interface MemberService {
 
     Page<MissionResDTO.MissionItemRes> getMyMissions(Long memberId, String status, Pageable pageable);
 
-    ReviewResDTO.ReviewListRes getMyReviews(Long memberId);
+    ReviewResDTO.CursorPagination<ReviewResDTO.ReviewItemRes> getMyReviews(
+            Long memberId, Integer pageSize, String cursor, String query);
 }
