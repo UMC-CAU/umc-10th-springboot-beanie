@@ -5,22 +5,31 @@ import com.example.umc_ch05_mission.global.security.handler.CustomAuthentication
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
-@Configuration
 @EnableWebSecurity
+@Configuration
 @RequiredArgsConstructor
 public class SecurityConfig {
 
     private final CustomAuthenticationEntryPoint authenticationEntryPoint;
     private final CustomAccessDeniedHandler accessDeniedHandler;
+
+    // 인증 없이 접근 가능한 URI 목록 (Public API)
+    private final String[] allowUris = {
+            // Swagger 허용
+            "/swagger-ui/**",
+            "/swagger-resources/**",
+            "/v3/api-docs/**",
+            // 회원가입, 로그인 허용
+            "/auth/**",
+            "/signin"
+    };
 
     /**
      * BCrypt 비밀번호 인코더 Bean
@@ -34,49 +43,36 @@ public class SecurityConfig {
     /**
      * Spring Security 필터 체인 설정
      *
-     * Public API (로그인 없이 접근 가능):
-     *   - POST /signin         → 회원가입
-     *   - POST /auth/login     → 로그인
-     *   - Swagger UI, API Docs → 개발 편의
-     *   - H2 Console          → 개발 편의
+     * Public API (로그인 없이 접근 가능): allowUris 에 포함된 경로
+     * Private API (로그인 필요): 그 외 모든 요청
      *
-     * Private API (로그인 필요):
-     *   - 그 외 모든 요청
+     * formLogin: Spring Security 기본 로그인 폼 사용
+     *   → 로그인 성공 시 Swagger로 리다이렉트
+     * logout: /logout 으로 로그아웃
      */
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // REST API이므로 CSRF 비활성화
                 .csrf(AbstractHttpConfigurer::disable)
 
-                // REST API이므로 세션 사용 안 함 (Stateless)
-                .sessionManagement(sm ->
-                        sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
                 // 요청별 인증/인가 설정
-                .authorizeHttpRequests(auth -> auth
-                        // Public API: 회원가입, 로그인
-                        .requestMatchers(HttpMethod.POST, "/signin").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
-
-                        // Public API: Swagger (개발 편의)
-                        .requestMatchers(
-                                "/swagger-ui/**",
-                                "/v3/api-docs/**",
-                                "/swagger-ui.html"
-                        ).permitAll()
-
-                        // Public API: H2 Console (개발 편의)
-                        .requestMatchers("/h2-console/**").permitAll()
-
-                        // 그 외 모든 요청 → 로그인 필요 (Private API)
-                        .anyRequest().authenticated()
+                .authorizeHttpRequests(requests -> requests
+                        .requestMatchers(allowUris).permitAll()   // Public API
+                        .anyRequest().authenticated()              // Private API
                 )
 
-                // HTTP Basic 인증 (이메일:비밀번호로 로그인)
-                // Authorization: Basic base64(email:password) 헤더로 인증
-                .httpBasic(basic ->
-                        basic.authenticationEntryPoint(authenticationEntryPoint))
+                // 폼 로그인 설정: 로그인 성공 시 Swagger로 이동
+                .formLogin(form -> form
+                        .defaultSuccessUrl("/swagger-ui/index.html", true)
+                        .permitAll()
+                )
+
+                // 로그아웃 설정
+                .logout(logout -> logout
+                        .logoutUrl("/logout")
+                        .logoutSuccessUrl("/login?logout")
+                        .permitAll()
+                )
 
                 // 인증/인가 실패 시 통일된 JSON 응답
                 .exceptionHandling(ex -> ex
