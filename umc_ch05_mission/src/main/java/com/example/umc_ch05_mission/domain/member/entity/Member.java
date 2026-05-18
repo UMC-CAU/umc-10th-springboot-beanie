@@ -7,6 +7,8 @@ import com.example.umc_ch05_mission.domain.region.entity.Region;
 import com.example.umc_ch05_mission.domain.review.entity.Review;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -15,6 +17,8 @@ import java.util.List;
 
 @Entity
 @Getter
+@Builder
+@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Member {
 
@@ -33,6 +37,7 @@ public class Member {
 
     private String phoneNumber;
 
+    @Builder.Default
     @Column(nullable = false)
     private Integer points = 0;
 
@@ -48,9 +53,11 @@ public class Member {
     @JoinColumn(name = "region_id")
     private Region region;
 
+    @Builder.Default
     @OneToMany(mappedBy = "member")
     private List<MemberMission> memberMissions = new ArrayList<>();
 
+    @Builder.Default
     @OneToMany(mappedBy = "member")
     private List<Review> reviews = new ArrayList<>();
 }
