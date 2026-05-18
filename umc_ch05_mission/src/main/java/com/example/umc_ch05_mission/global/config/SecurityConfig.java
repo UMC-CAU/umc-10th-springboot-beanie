@@ -2,7 +2,6 @@ package com.example.umc_ch05_mission.global.config;
 
 import com.example.umc_ch05_mission.global.security.handler.CustomAccessDeniedHandler;
 import com.example.umc_ch05_mission.global.security.handler.CustomAuthenticationEntryPoint;
-import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -14,11 +13,7 @@ import org.springframework.security.web.SecurityFilterChain;
 
 @EnableWebSecurity
 @Configuration
-@RequiredArgsConstructor
 public class SecurityConfig {
-
-    private final CustomAuthenticationEntryPoint authenticationEntryPoint;
-    private final CustomAccessDeniedHandler accessDeniedHandler;
 
     // 인증 없이 접근 가능한 URI 목록 (Public API)
     private final String[] allowUris = {
@@ -31,25 +26,23 @@ public class SecurityConfig {
             "/signin"
     };
 
-    /**
-     * BCrypt 비밀번호 인코더 Bean
-     * 회원가입 시 비밀번호를 솔트(salt) 처리하여 안전하게 저장
-     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    /**
-     * Spring Security 필터 체인 설정
-     *
-     * Public API (로그인 없이 접근 가능): allowUris 에 포함된 경로
-     * Private API (로그인 필요): 그 외 모든 요청
-     *
-     * formLogin: Spring Security 기본 로그인 폼 사용
-     *   → 로그인 성공 시 Swagger로 리다이렉트
-     * logout: /logout 으로 로그아웃
-     */
+    // 403 핸들러 Bean 등록
+    @Bean
+    public CustomAccessDeniedHandler customAccessDenied() {
+        return new CustomAccessDeniedHandler();
+    }
+
+    // 401 핸들러 Bean 등록
+    @Bean
+    public CustomAuthenticationEntryPoint customEntryPoint() {
+        return new CustomAuthenticationEntryPoint();
+    }
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -74,10 +67,10 @@ public class SecurityConfig {
                         .permitAll()
                 )
 
-                // 인증/인가 실패 시 통일된 JSON 응답
-                .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint(authenticationEntryPoint)  // 401: 미인증
-                        .accessDeniedHandler(accessDeniedHandler)             // 403: 권한 없음
+                // 예외 상황 핸들러
+                .exceptionHandling(exception -> exception
+                        .accessDeniedHandler(customAccessDenied())         // 403: 권한 없음
+                        .authenticationEntryPoint(customEntryPoint())      // 401: 미인증
                 );
 
         return http.build();
