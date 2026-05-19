@@ -1,10 +1,13 @@
 package com.example.umc_ch05_mission.domain.member.service;
 
+import com.example.umc_ch05_mission.domain.member.converter.MemberConverter;
 import com.example.umc_ch05_mission.domain.member.dto.MemberReqDTO;
 import com.example.umc_ch05_mission.domain.member.dto.MemberResDTO;
+import com.example.umc_ch05_mission.domain.member.entity.Member;
 import com.example.umc_ch05_mission.domain.member.exception.MemberException;
 import com.example.umc_ch05_mission.domain.member.exception.code.MemberErrorCode;
 import com.example.umc_ch05_mission.domain.member.repository.MemberRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import com.example.umc_ch05_mission.domain.mission.dto.MissionResDTO;
 import com.example.umc_ch05_mission.domain.mission.entity.mapping.MemberMission;
 import com.example.umc_ch05_mission.domain.mission.enums.MissionStatus;
@@ -31,6 +34,7 @@ public class MemberServiceImpl implements MemberService {
     private final MemberRepository memberRepository;
     private final MemberMissionRepository memberMissionRepository;
     private final ReviewRepository reviewRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public MemberResDTO.MyPageRes getMyPageInfo(Long memberId) {
@@ -60,7 +64,22 @@ public class MemberServiceImpl implements MemberService {
     }
 
     @Override
-    public MemberResDTO.SignUpRes signUp(MemberReqDTO.SignUpReq req) { return null; }
+    @Transactional
+    public MemberResDTO.SignUpRes signUp(MemberReqDTO.SignUpReq req) {
+        // 이메일 중복 확인
+        if (memberRepository.findByEmail(req.getEmail()).isPresent()) {
+            throw new MemberException(MemberErrorCode.MEMBER_ALREADY_EXISTS);
+        }
+
+        // 비밀번호 BCrypt 암호화 (솔트 처리)
+        String encodedPassword = passwordEncoder.encode(req.getPassword());
+
+        // Member 엔티티 생성 후 저장
+        Member member = MemberConverter.toMember(req, encodedPassword);
+        Member saved = memberRepository.save(member);
+
+        return MemberConverter.toSignUpRes(saved);
+    }
 
     @Override
     public MemberResDTO.LoginRes login(MemberReqDTO.LoginReq req) { return null; }
